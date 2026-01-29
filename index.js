@@ -1,3 +1,15 @@
+if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+  const fs = require("fs");
+  const path = "/tmp/serviceAccount.json";
+
+  fs.writeFileSync(
+    path,
+    process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON
+  );
+
+  process.env.GOOGLE_APPLICATION_CREDENTIALS = path;
+}
+
 require("dotenv").config();
 
 const express = require("express");
@@ -20,6 +32,9 @@ app.use("/api", notificationRoutes);
 
 const tokenRoutes = require("./routes/tokenRoutes");
 app.use("/api", tokenRoutes);
+
+const liveEventRoutes = require("./routes/liveEventRoutes");
+app.use("/api", liveEventRoutes);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

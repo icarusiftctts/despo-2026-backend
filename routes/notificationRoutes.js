@@ -4,8 +4,7 @@ const router = express.Router();
 const verifyFirebaseToken = require("../config/authMiddleware");
 const requireAdmin = require("../config/adminMiddleware");
 
-const { db } = require("../config/firebase");
-const admin = require("firebase-admin");
+const { db, admin } = require("../config/firebase");
 
 async function getAllFcmTokens() {
     const snapshot = await db.collection("users").get();
@@ -86,7 +85,7 @@ router.post(
             const docRef = await db.collection("notifications").add({
                 title,
                 body,
-                createdAt: new Date(),
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
             });
 
             // 2. Fetch all tokens
