@@ -5,39 +5,83 @@ const verifyFirebaseToken = require("../config/authMiddleware");
 const requireAdmin = require("../config/adminMiddleware");
 const { db, admin } = require("../config/firebase");
 
-// Create live event (admin)
+/**
+ * CREATE LIVE EVENT (ADMIN)
+ */
 router.post(
     "/live-events",
     verifyFirebaseToken,
     requireAdmin,
     async (req, res) => {
-        const { title, description, eventAt } = req.body;
+        const {
+            sport,
+            title,
+            teamA,
+            teamB,
+            venue,
+            startTime,
+            endTime,
+            isVisible = true,
+        } = req.body;
 
-        if (!title || !description || !eventAt) {
+        // ---- Validation ----
+        if (
+            !sport ||
+            !title ||
+            !teamA ||
+            !teamB ||
+            !venue ||
+            !startTime ||
+            !endTime
+        ) {
             return res.status(400).json({
                 success: false,
-                message: "title, description, and eventAt are required",
+                message:
+                    "sport, title, teamA, teamB, venue, startTime, endTime are required",
+            });
+        }
+
+        const start = new Date(startTime);
+        const end = new Date(endTime);
+
+        if (isNaN(start) || isNaN(end)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid startTime or endTime",
+            });
+        }
+
+        if (start >= end) {
+            return res.status(400).json({
+                success: false,
+                message: "startTime must be before endTime",
             });
         }
 
         try {
             const docRef = await db.collection("live_events").add({
+                sport,
                 title,
-                description,
-                eventAt: admin.firestore.Timestamp.fromDate(
-                    new Date(eventAt)
-                ),
-                status: "scheduled",
-                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                teamA,
+                teamB,
+                venue,
+                startTime: admin.firestore.Timestamp.fromDate(start),
+                endTime: admin.firestore.Timestamp.fromDate(end),
+                isVisible,
+
+                // admin / metadata
+                status: "upcoming", // optional, ignored by client
                 createdBy: req.user.uid,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
 
-            res.status(201).json({
+            return res.status(201).json({
                 success: true,
                 eventId: docRef.id,
             });
         } catch (err) {
-            res.status(500).json({
+            return res.status(500).json({
                 success: false,
                 error: err.message,
             });
@@ -45,7 +89,9 @@ router.post(
     }
 );
 
-// Fetch upcoming events (admin)
+/**
+ * FETCH ALL EVENTS (ADMIN)
+ */
 router.get(
     "/live-events",
     verifyFirebaseToken,
@@ -54,8 +100,8 @@ router.get(
         try {
             const snapshot = await db
                 .collection("live_events")
-                .orderBy("eventAt", "asc")
-                .limit(50)
+                .orderBy("startTime", "asc")
+                .limit(100)
                 .get();
 
             const events = snapshot.docs.map((doc) => ({
@@ -63,12 +109,12 @@ router.get(
                 ...doc.data(),
             }));
 
-            res.json({
+            return res.json({
                 success: true,
                 events,
             });
         } catch (err) {
-            res.status(500).json({
+            return res.status(500).json({
                 success: false,
                 error: err.message,
             });
